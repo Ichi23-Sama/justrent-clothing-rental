@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JUST RENT — Rental History</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    h1 {
+      color: #76442e;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin: 20px 0 32px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background: #3ca197;
+      color: white;
+    }
+
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>JUST RENT</h1>
+
+  <nav>
+    <a href="/index.html">Clothing Catalog</a>
+    <a href="/rentals.html">Rental History</a>
+    <a href="/login.html">Log in / Register</a>
+  </nav>
+
+  <h2>Rental History</h2>
+  <p id="account-status">Checking login...</p>
+    <section id="payment-section" hidden>
+    <h3>Record Payment</h3>
+
+    <form id="payment-form">
+        <p>
+            <label for="payment-rental-id">Rental ID</label><br>
+            <input id="payment-rental-id" type="number" min="1" required>
+        </p>
+
+        <p>
+            <label for="payment-amount">Amount (THB)</label><br>
+            <input id="payment-amount" type="number" min="0.01"
+                   step="0.01" required>
+        </p>
+
+        <p>
+            <label for="payment-method">Payment method</label><br>
+            <select id="payment-method" required>
+                <option value="">Choose a method</option>
+                <option value="Cash">Cash</option>
+                <option value="Transfer">Transfer</option>
+                <option value="Card">Card</option>
+            </select>
+        </p>
+
+        <button type="submit">Record Payment</button>
+    </form>
+
+    <p id="payment-message" role="status"></p>
+</section>
+  <main id="history-content" hidden>
+    <p id="rentals-message" role="status">Loading rental history...</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <!-- <tr>
+            <th>Rental ID</th>
+            <th>Customer</th>
+            <th>Start Date</th>
+            <th>Due Date</th>
+            <th>Status</th>
+            <th id="actions-heading" hidden>Actions</th>
+          </tr> -->
+
+          <tr>
+    <th>Rental ID</th>
+    <th>Garment(s)</th>
+    <th>Rented On</th>
+    <th>Return Due</th>
+    <th>Returned On</th>
+    <th>Status</th>
+    <th>Total (THB)</th>
+    <th>Paid (THB)</th>
+    <th>Balance (THB)</th>
+    <th id="actions-heading" hidden>Actions</th>
+</tr>
+        </thead>
+        <tbody id="rentals-list"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <section id="rental-activity-section" hidden>
+    <h2>Pickup and Return Activity</h2>
+    <p id="activity-message" role="status">Loading activity...</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Date and time</th><th>Staff</th><th>Action</th><th>User</th><th>Garment</th><th>Rental ID</th></tr></thead>
+        <tbody id="activity-list"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <script>
+    let canManageRentals = false;
+
+    async function checkLogin() {
+      const status = document.getElementById('account-status');
+
+      try {
+        const response = await fetch('/api/me');
+
+        if (response.status === 401) {
+          status.textContent = 'Please log in to view your rental history.';
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Unable to check login.');
+        }
+
+        const result = await response.json();
+        const user = result.user;
+
+        canManageRentals =
+          user.role === 'Admin' || user.role === 'Developer';
+
+          document.getElementById('payment-section').hidden = !canManageRentals;
+
+        status.textContent =
+          `Logged in as ${user.name} (${user.role}).`;
+
+        document.getElementById('history-content').hidden = false;
+        document.getElementById('actions-heading').hidden =
+          !canManageRentals;
+
+        await loadRentals();
+        if (user.role === 'Developer') await loadRentalActivity();
+      } catch (error) {
+        status.textContent =
+          'Unable to check login. Please refresh and try again.';
+      }
+    }
+
+    async function loadRentals() {
+      const message = document.getElementById('rentals-message');
+      const list = document.getElementById('rentals-list');
+
+      message.textContent = 'Loading rental history...';
+
+      try {
+        const response = await fetch('/api/rentals');
+        const rentals = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            rentals.error || 'Unable to load rental history.'
+          );
+        }
+
+        list.replaceChildren();
+
+        for (const rental of rentals) {
+          const row = document.createElement('tr');
+
+        const values = [
+    rental.rental_id,
+    rental.clothing_names || 'Garment details unavailable',
+    String(rental.start_date).slice(0, 10),
+    String(rental.due_date).slice(0, 10),
+    rental.returned_date || 'Not returned',
+    rental.status,
+    Number(rental.total_charge).toFixed(2),
+    Number(rental.amount_paid).toFixed(2),
+    Number(rental.balance).toFixed(2)
+
+    
+];
+
+          for (const value of values) {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            row.appendChild(cell);
+          }
+
+          if (canManageRentals) {
+            const actions = document.createElement('td');
+
+            if (rental.status === 'Reserved') {
+              const button = document.createElement('button');
+              button.textContent = 'Record Pickup';
+              button.addEventListener('click', () =>
+                updateRental(rental.rental_id, 'pickup', button)
+              );
+              actions.appendChild(button);
+            } else if (rental.status === 'Active') {
+              const button = document.createElement('button');
+              button.textContent = 'Record Return';
+              button.addEventListener('click', () =>
+                updateRental(rental.rental_id, 'return', button)
+              );
+              actions.appendChild(button);
+            } else {
+              actions.textContent = '—';
+            }
+
+            row.appendChild(actions);
+          }
+
+          list.appendChild(row);
+        }
+
+        message.textContent = rentals.length
+          ?` ${rentals.length} rental(s) found.`
+          : 'No rentals yet.';
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+
+    async function loadRentalActivity() {
+      const section = document.getElementById('rental-activity-section');
+      const message = document.getElementById('activity-message');
+      const list = document.getElementById('activity-list');
+      section.hidden = false;
+      try {
+        const response = await fetch('/api/rentals/activity');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to load activity.');
+        list.replaceChildren();
+        for (const event of result) {
+          const row = document.createElement('tr');
+          const values = [event.performed_at, `${event.staff_name} (${event.staff_role})`, event.action,
+            event.customer_name, event.clothing_name, event.rental_id];
+          for (const value of values) {
+            const cell = document.createElement('td');
+            cell.textContent = value ?? '—';
+            row.appendChild(cell);
+          }
+          list.appendChild(row);
+        }
+        message.textContent = result.length ? `${result.length} pickup/return event(s).` : 'No pickup or return activity yet.';
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    async function updateRental(rentalId, action, button) {
+      if (
+        action === 'return' &&
+        !confirm(`Confirm Rental #${rentalId} has been returned?`)
+      ) {
+        return;
+      }
+
+      button.disabled = true;
+
+      try {
+        const response = await fetch(
+          `/api/rentals/${rentalId}/${action}`,
+          { method: 'PUT' }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Unable to update rental.');
+        }
+
+        document.getElementById('rentals-message').textContent =
+          result.message;
+
+        await loadRentals();
+        if (!document.getElementById('rental-activity-section').hidden) await loadRentalActivity();
+      } catch (error) {
+        document.getElementById('rentals-message').textContent =
+          error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById('payment-form').addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const message = document.getElementById('payment-message');
+
+    try {
+        const response = await fetch('/api/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rental_id: document.getElementById('payment-rental-id').value,
+                amount: document.getElementById('payment-amount').value,
+                method: document.getElementById('payment-method').value
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Unable to record payment.');
+        }
+
+        message.textContent = result.message;
+        form.reset();
+        await loadRentals();
+    } catch (error) {
+        message.textContent = error.message;
+    }
+});
+
+    checkLogin();
+  </script>
+</body>
+</html>

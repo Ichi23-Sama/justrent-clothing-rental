@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUST//RENT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+            color: #222;
+        }
+
+        h1 {
+            color: #76442e;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            padding: 14px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #3ca197;
+            color: white;
+        }
+    
+        [hidden] { display: none !important; }
+        nav, .catalog-navigation { display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin:20px 0; }
+        button, .rent-link { border:0; border-radius:8px; background:#23483e; color:white; padding:10px 16px; cursor:pointer; font:inherit; }
+        button:disabled { opacity:.55; cursor:not-allowed; }
+        input, select { max-width:100%; box-sizing:border-box; padding:10px; border:1px solid #bbb; border-radius:6px; }
+        .clothing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px; margin:24px 0; }
+        .clothing-card { background:white; border-radius:14px; overflow:hidden; border:1px solid #e1e5e2; }
+        .card-photo { display:flex; align-items:center; justify-content:center; height:280px; background:#e9eeeb; color:#52635b; }
+        .card-photo img { width:100%; height:100%; object-fit:contain; }
+        .card-body { padding:18px; }
+        .card-body h2 { font-size:21px; margin:0 0 12px; }
+        .stock-label { font-size:14px; font-weight:bold; color:#23483e; }
+        dialog { border:0; border-radius:16px; width:min(480px,calc(100% - 48px)); max-height:85vh; overflow:auto; padding:24px; box-shadow:0 20px 70px #0004; }
+        dialog::backdrop { background:#0007; }
+        #detail-photo { height:300px; border-radius:10px; overflow:hidden; }
+        .detail-actions { display:flex; gap:12px; align-items:center; margin-top:24px; }
+        .rent-link { display:inline-block; text-decoration:none; }
+        .table-scroll { overflow-x:auto; }
+        #selected-clothing { background:white; padding:16px; border-radius:12px; margin:16px 0; }
+        #selected-photo img { max-width:100%; height:180px; object-fit:contain; }
+
+    </style>
+</head>
+<body>
+    <h1>JUST//RENT</h1>
+
+    <p id="account-status">Checking login...</p>
+<div class="catalog-navigation"><a href="/login.html">Log in / Register</a>
+<a href="/rentals.html">Rentals</a>
+<button id="logout-button" type="button" hidden>Log Out</button></div>
+    <p>Find your next outfit. Open Details to choose a garment and rent it.</p>
+
+    <p id="message" role="status">Loading clothing...</p>
+
+    <section>
+    <h2>Clothing Availability</h2>
+    <p>Current stock status. Reservations depend on your chosen dates.</p>
+
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Total</th>
+                    <th>Rented</th>
+                    <th>Available</th>
+                </tr>
+            </thead>
+            <tbody id="availability-list"></tbody>
+        </table>
+    </div>
+</section>
+
+  <section id="clothing-management" hidden> 
+<h2>Add Clothing</h2>
+
+<form id="add-clothing-form">
+    <p>
+        <label for="clothing-name">Clothing name</label><br>
+        <input id="clothing-name" type="text" maxlength="100" required>
+    </p>
+
+    <p>
+        <label for="clothing-category">Category</label><br>
+        <select id="clothing-category" required disabled>
+            <option value="">Loading categories...</option>
+        </select>
+    </p>
+
+    <p>
+        <label for="clothing-size">Size</label><br>
+        <select id="clothing-size" required>
+            <option value="">Choose a size</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+            <option value="XL">XL</option>
+        </select>
+    </p>
+
+    <p>
+        <label for="daily-rate">Daily rate (THB)</label><br>
+        <input id="daily-rate" type="number"
+               min="0" max="99999999.99" step="0.01" required>
+    </p>
+
+    <p>
+    <label for="clothing-image">Image path (optional)</label><br>
+    <input id="clothing-image"
+           type="text"
+           maxlength="255"
+           placeholder="/images/image.png">
+</p>
+<p>
+    <label for="clothing-photo">Choose a picture</label><br>
+    <input id="clothing-photo"
+           type="file"
+           accept="image/jpeg,image/png,image/webp">
+
+    <button id="upload-photo-button" type="button">
+        Upload Photo
+    </button>
+</p>
+
+<p id="upload-message" role="status"></p>
+
+    <button id="add-button" type="submit">Add Clothing</button>
+</form>
+
+<p id="form-message" role="status"></p>
+</section>
+
+    <div id="clothing-cards" class="clothing-grid" hidden></div>
+    <div id="clothing-table-container" class="table-scroll" hidden>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Photo</th>
+                <th>Clothing Name</th>
+                <th>Category</th>
+                <th>Size</th>
+                <th>Daily Rate (THB)</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="clothing-list"></tbody>
+    </table>
+    </div>
+
+    <section id="account-management" hidden>
+    <h2>User Accounts</h2>
+    <p>Only Developer can view this section.</p>
+
+    <p id="accounts-message" role="status"></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Account status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="accounts-list"></tbody>
+    </table>
+</section>
+
+
+    <dialog id="clothing-details" aria-labelledby="detail-name">
+        <div id="detail-photo" class="card-photo"></div>
+        <h2 id="detail-name"></h2>
+        <p id="detail-category"></p>
+        <p id="detail-size"></p>
+        <p id="detail-rate"></p>
+        <p id="detail-status" class="stock-label"></p>
+        <p>Availability for your selected dates is checked when you book.</p>
+        <div class="detail-actions">
+            <a id="detail-rent" class="rent-link">Rent this garment</a>
+            <button id="close-details" type="button">Close</button>
+        </div>
+    </dialog>
+
+    <script>
+
+        let canManageClothing = false;
+        let currentUser = null;
+        const formMessage = document.getElementById('form-message');
+
+        async function loadCategories() {
+    const dropdown = document.getElementById('clothing-category');
+
+    try {
+        const response = await fetch('/api/categories');
+
+        if (!response.ok) {
+            throw new Error('Unable to load categories.');
+        }
+
+        const categories = await response.json();
+
+        dropdown.replaceChildren(
+            new Option('Choose a category', '')
+        );
+
+        for (const category of categories) {
+            dropdown.add(
+                new Option(
+                    category.category_name,
+                    category.category_id
+                )
+            );
+        }
+
+        dropdown.disabled = categories.length === 0;
+
+        if (categories.length === 0) {
+            formMessage.textContent = 'No categories available.';
+        }
+    } catch (error) {
+        dropdown.replaceChildren(
+            new Option('Categories unavailable', '')
+        );
+
+        formMessage.textContent =
+            'Unable to load categories. Please refresh and try again.';
+    }
+}
+
+loadCategories();
+        async function loadClothing() {
+            const message = document.getElementById('message');
+            const list = document.getElementById('clothing-list');
+
+            try {
+                // Ask Express for the clothing records.
+                const response = await fetch('/api/clothing');
+
+                if (!response.ok) {
+                    throw new Error('Request failed');
+                }
+
+                const clothes = await response.json();
+                showAvailability(clothes);
+                list.replaceChildren();
+                const cards = document.getElementById('clothing-cards');
+                cards.replaceChildren();
+                cards.hidden = canManageClothing;
+                document.getElementById('clothing-table-container').hidden = !canManageClothing;
+
+                if (!canManageClothing) {
+                    renderClothingCards(clothes);
+                    message.textContent = clothes.length
+                        ? `${clothes.length} clothing items found.`
+                        : 'No clothing items yet.';
+                    return;
+                }
+
+                // Create one table row for each garment.
+                for (const clothing of clothes) {
+                    const row = document.createElement('tr');
+
+                    const values = [
+    clothing.clothing_id,
+    clothing.clothing_name,
+    clothing.category_name || 'Unassigned',
+    clothing.size,
+    Number(clothing.daily_rate).toFixed(2),
+    Number(clothing.is_rented) === 1 ? 'Rented' : 'Available'
+];
+
+                    for (const value of values) {
+                        const cell = document.createElement('td');
+                        cell.textContent = value;
+                        row.appendChild(cell);
+                    }
+
+                    const photoCell = document.createElement('td');
+
+if (clothing.image_path) {
+    const image = document.createElement('img');
+
+    image.src = clothing.image_path;
+    image.alt = clothing.clothing_name;
+    image.width = 80;
+    image.height = 100;
+    image.style.objectFit = 'cover';
+    image.style.borderRadius = '8px';
+
+    image.addEventListener('error', () => {
+        photoCell.textContent = 'Image unavailable';
+    });
+
+    photoCell.appendChild(image);
+} else {
+    photoCell.textContent = 'No photo';
+}
+
+// Insert the photo after the ID cell.
+row.insertBefore(photoCell, row.children[1]);
+
+                    const actionsCell = document.createElement('td');
+const editButton = document.createElement('button');
+
+editButton.type = 'button';
+editButton.textContent = 'Edit';
+
+editButton.addEventListener('click', () => {
+    editingId = clothing.clothing_id;
+
+    document.getElementById('clothing-image').value =
+    clothing.image_path || '';
+
+    document.getElementById('clothing-category').value =
+    clothing.category_id == null ? '' : String(clothing.category_id);
+
+    document.getElementById('clothing-name').value =
+        clothing.clothing_name;
+    document.getElementById('clothing-size').value =
+        clothing.size;
+    document.getElementById('daily-rate').value =
+        clothing.daily_rate;
+
+    document.getElementById('add-button').textContent = 'Save Changes';
+    document.getElementById('form-message').textContent =
+        `Editing: ${clothing.clothing_name}`;
+
+    document.getElementById('clothing-name').focus();
+});
+
+const deleteButton = document.createElement('button');
+
+deleteButton.type = 'button';
+deleteButton.textContent = 'Delete';
+
+deleteButton.addEventListener('click', async () => {
+    const confirmed = confirm(
+        `Delete "${clothing.clothing_name}"? This cannot be undone.`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const message = document.getElementById('form-message');
+    deleteButton.disabled = true;
+
+    try {
+        const response = await fetch(
+            `/api/clothing/${clothing.clothing_id}`,
+            { method: 'DELETE' }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Unable to delete clothing.');
+        }
+
+        // Clear the form if the deleted garment was being edited.
+        if (editingId === clothing.clothing_id) {
+            addForm.reset();
+            editingId = null;
+            document.getElementById('add-button').textContent =
+                'Add Clothing';
+        }
+
+        message.textContent = result.message;
+        await loadClothing();
+    } catch (error) {
+        message.textContent = error.message;
+    } finally {
+        deleteButton.disabled = false;
+    }
+});
+
+actionsCell.appendChild(editButton);
+actionsCell.appendChild(deleteButton);
+actionsCell.hidden = !canManageClothing;
+row.appendChild(actionsCell);
+
+                    list.appendChild(row);
+                }
+
+                message.textContent = clothes.length
+                    ? `${clothes.length} clothing items found.`
+                    : 'No clothing items yet.';
+            } catch (error) {
+                message.textContent =
+                    'Unable to load clothing. Please refresh and try again.';
+            }
+        }
+
+
+        let editingId = null;
+
+const addForm = document.getElementById('add-clothing-form');
+
+addForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const message = document.getElementById('form-message');
+    const button = document.getElementById('add-button');
+    const isEditing = editingId !== null;
+
+    const clothing = {
+
+    image_path:
+    document.getElementById('clothing-image').value.trim(),
+
+    clothing_name:
+        document.getElementById('clothing-name').value.trim(),
+    category_id:
+        document.getElementById('clothing-category').value,
+    size:
+        document.getElementById('clothing-size').value,
+    daily_rate:
+        document.getElementById('daily-rate').value
+};
+
+    button.disabled = true;
+    message.textContent = 'Saving...';
+
+    try {
+        const url = isEditing
+            ? `/api/clothing/${editingId}`
+            : '/api/clothing';
+
+        const response = await fetch(url, {
+            method: isEditing ? 'PUT' : 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(clothing)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Unable to save clothing.');
+        }
+
+        message.textContent = result.message;
+        addForm.reset();
+        editingId = null;
+        button.textContent = 'Add Clothing';
+
+        await loadClothing();
+    } catch (error) {
+        message.textContent = error.message;
+    } finally {
+        button.disabled = false;
+    }
+});
+
+async function showCurrentUser() {
+    const status = document.getElementById('account-status');
+
+    canManageClothing = false;
+
+    try {
+        const response = await fetch('/api/me');
+
+        if (response.status === 401) {
+            status.textContent = 'Browsing as a guest.';
+        } else {
+            if (!response.ok) {
+                throw new Error('Unable to check login.');
+            }
+
+            const result = await response.json();
+            currentUser = result.user;
+            document.getElementById('logout-button').hidden = false;
+
+            status.textContent =
+                `Logged in as ${result.user.name} (${result.user.role}).`;
+
+            canManageClothing =
+                ['Admin', 'Developer'].includes(result.user.role);
+        }
+    } catch (error) {
+        status.textContent = 'Unable to check login. Please refresh.';
+    }
+
+    document.getElementById('clothing-management').hidden =
+        !canManageClothing;
+
+    document.querySelector(
+    '#clothing-table-container thead th:last-child'
+).hidden = !canManageClothing;
+
+    await loadClothing();
+}
+
+showCurrentUser();
+
+
+document.getElementById('logout-button')
+    .addEventListener('click', async () => {
+        try {
+            const response = await fetch('/api/logout', {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                throw new Error('Unable to log out. Please try again.');
+            }
+
+            window.location.reload();
+        } catch (error) {
+            document.getElementById('account-status').textContent =
+                error.message;
+        }
+    });
+
+    async function loadAccounts() {
+    const section = document.getElementById('account-management');
+    const message = document.getElementById('accounts-message');
+    const list = document.getElementById('accounts-list');
+
+    section.hidden = true;
+    list.replaceChildren();
+
+    try {
+        const response = await fetch('/api/users');
+
+        // Guests, Users, and Admins cannot view this section.
+        if (response.status === 401 || response.status === 403) {
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error('Unable to load accounts.');
+        }
+
+        const accounts = await response.json();
+
+        for (const account of accounts) {
+            const row = document.createElement('tr');
+
+            for (const value of [
+                account.user_id, account.name, account.email, account.role,
+                Number(account.is_active) ? 'Active' : 'Deactivated'
+            ]) {
+                const cell = document.createElement('td');
+                cell.textContent = value;
+                row.appendChild(cell);
+            }
+
+            const actionCell = document.createElement('td');
+            if (['User', 'Admin'].includes(account.role)) {
+                const button = document.createElement('button');
+                button.textContent = Number(account.is_active) ? 'Deactivate' : 'Reactivate';
+                button.addEventListener('click', () =>
+                    setAccountStatus(account.user_id, !Number(account.is_active), button)
+                );
+                actionCell.appendChild(button);
+            } else {
+                actionCell.textContent = '—';
+            }
+            row.appendChild(actionCell);
+            list.appendChild(row);
+        }
+
+        message.textContent = `${accounts.length} accounts found.`;
+        section.hidden = false;
+    } catch (error) {
+        document.getElementById('account-status').textContent =
+            'Unable to load accounts. Please refresh and try again.';
+    }
+}
+
+async function setAccountStatus(userId, isActive, button) {
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/users/${userId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: isActive })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to update account.');
+        document.getElementById('accounts-message').textContent = result.message;
+        await loadAccounts();
+    } catch (error) {
+        document.getElementById('accounts-message').textContent = error.message;
+    } finally {
+        button.disabled = false;
+    }
+}
+
+
+loadAccounts();
+
+
+document.getElementById('upload-photo-button')
+    .addEventListener('click', async () => {
+        const input = document.getElementById('clothing-photo');
+        const button = document.getElementById('upload-photo-button');
+        const message = document.getElementById('upload-message');
+        const file = input.files[0];
+
+        if (!file) {
+            message.textContent = 'Please choose a picture first.';
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            message.textContent = 'Picture must be 5 MB or smaller.';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        button.disabled = true;
+        document.getElementById('add-button').disabled = true;
+        message.textContent = 'Uploading...';
+
+        try {
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Upload failed.');
+            }
+
+            document.getElementById('clothing-image').value =
+                result.image_path;
+
+            input.value = '';
+
+            message.textContent =
+                'Photo uploaded. Click Add Clothing or Save Changes to save it to the garment.';
+        } catch (error) {
+            message.textContent = error.message;
+        } finally {
+            button.disabled = false;
+            document.getElementById('add-button').disabled = false;
+        }
+    });
+
+function displayPhoto(container, clothing) {
+    container.replaceChildren();
+    if (!clothing.image_path) {
+        container.textContent = 'No photo';
+        return;
+    }
+    const image = document.createElement('img');
+    image.src = clothing.image_path;
+    image.alt = clothing.clothing_name;
+    image.loading = 'lazy';
+    image.addEventListener('error', () => {
+        container.textContent = 'Image unavailable';
+    });
+    container.appendChild(image);
+}
+
+function openClothingDetails(clothing) {
+    const dialog = document.getElementById('clothing-details');
+    displayPhoto(document.getElementById('detail-photo'), clothing);
+    document.getElementById('detail-name').textContent = clothing.clothing_name;
+    document.getElementById('detail-category').textContent =
+        `Category: ${clothing.category_name || 'Unassigned'}`;
+    document.getElementById('detail-size').textContent = `Size: ${clothing.size}`;
+    document.getElementById('detail-rate').textContent =
+        `${Number(clothing.daily_rate).toFixed(2)} THB per day`;
+    document.getElementById('detail-status').textContent =
+        Number(clothing.is_rented) === 1 ? 'Currently rented' : 'Not currently rented';
+    const rentLink = document.getElementById('detail-rent');
+    const target = `/booking.html?clothing_id=${encodeURIComponent(clothing.clothing_id)}`;
+    rentLink.href = currentUser ? target : '/login.html';
+    rentLink.textContent = currentUser ? 'Rent this garment' : 'Log in to rent';
+    dialog.showModal();
+}
+
+function renderClothingCards(clothes) {
+    const grid = document.getElementById('clothing-cards');
+    for (const clothing of clothes) {
+        const card = document.createElement('article');
+        card.className = 'clothing-card';
+        const photo = document.createElement('div');
+        photo.className = 'card-photo';
+        displayPhoto(photo, clothing);
+        const body = document.createElement('div');
+        body.className = 'card-body';
+        const title = document.createElement('h2');
+        title.textContent = clothing.clothing_name;
+        const size = document.createElement('p');
+        size.textContent = `${clothing.category_name || 'Clothing'} · Size ${clothing.size}`;
+        const rate = document.createElement('p');
+        rate.textContent = `${Number(clothing.daily_rate).toFixed(2)} THB / day`;
+        const status = document.createElement('p');
+        status.className = 'stock-label';
+        status.textContent = Number(clothing.is_rented) === 1 ? 'Currently rented' : 'Not currently rented';
+        const details = document.createElement('button');
+        details.type = 'button';
+        details.textContent = 'Details';
+        details.addEventListener('click', () => openClothingDetails(clothing));
+        body.append(title, size, rate, status, details);
+        card.append(photo, body);
+        grid.appendChild(card);
+    }
+}
+
+document.getElementById('close-details').addEventListener('click', () => {
+    document.getElementById('clothing-details').close();
+});
+
+function showAvailability(clothes) {
+    const list = document.getElementById('availability-list');
+    list.replaceChildren();
+
+    const categories = new Map();
+
+    for (const clothing of clothes) {
+        const category = clothing.category_name || 'Unassigned';
+
+        if (!categories.has(category)) {
+            categories.set(category, { total: 0, rented: 0 });
+        }
+
+        const counts = categories.get(category);
+        counts.total++;
+
+        if (Number(clothing.is_rented) === 1) {
+            counts.rented++;
+        }
+    }
+
+    let total = 0;
+    let rented = 0;
+
+    function addRow(values) {
+        const row = document.createElement('tr');
+
+        for (const value of values) {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            row.appendChild(cell);
+        }
+
+        list.appendChild(row);
+    }
+
+    for (const [category, counts] of categories) {
+        addRow([
+            category,
+            counts.total,
+            counts.rented,
+            counts.total - counts.rented
+        ]);
+
+        total += counts.total;
+        rented += counts.rented;
+    }
+
+    addRow(['All clothing', total, rented, total - rented]);
+}
+
+
+    </script>
+</body>
+</html>

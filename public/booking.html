@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JUST//RENT — Book Clothing</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    h1 {
+      color: #76442e;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin: 20px 0 32px;
+    }
+
+    input, select, button {
+      box-sizing: border-box;
+      max-width: 100%;
+      padding: 10px;
+      font: inherit;
+    }
+
+    button, .button-link {
+      display: inline-block;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 16px;
+      background: #23483e;
+      color: white;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    form, #selected-clothing {
+      background: white;
+      padding: 20px;
+      border-radius: 14px;
+      margin: 20px 0;
+    }
+
+    #selected-clothing {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    #selected-photo {
+      width: 220px;
+      height: 260px;
+      display: grid;
+      place-items: center;
+      background: #e9eeeb;
+      border-radius: 10px;
+    }
+
+    #selected-photo img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    form p {
+      margin: 0 0 20px;
+    }
+
+    #booking-content[hidden],
+    #selected-clothing[hidden] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>JUST//RENT</h1>
+
+  <nav>
+    <a href="/index.html">Clothing Catalog</a>
+    <a href="/rentals.html">Rental History</a>
+    <a href="/login.html">Log in / Register</a>
+  </nav>
+
+  <h2>Book Clothing</h2>
+  <p id="account-status">Checking login...</p>
+
+  <main id="booking-content" hidden>
+    <section id="selected-clothing" hidden>
+      <div id="selected-photo"></div>
+      <div>
+        <h3 id="selected-name"></h3>
+        <p id="selected-description"></p>
+      </div>
+    </section>
+
+    <form id="rental-form">
+      <p>
+        <label for="rental-clothing">Clothing</label><br>
+        <select id="rental-clothing" required disabled>
+          <option value="">Loading clothing...</option>
+        </select>
+      </p>
+
+      <p>
+        <label for="start-date">Start date</label><br>
+        <input id="start-date" type="date" required>
+      </p>
+
+      <p>
+        <label for="due-date">Due date</label><br>
+        <input id="due-date" type="date" required>
+      </p>
+
+      <button id="book-button" type="submit" disabled>Create Rental</button>
+    </form>
+
+    <p id="booking-message" role="status"></p>
+  </main>
+
+  <script>
+    const selectedClothingId =
+      new URLSearchParams(window.location.search).get('clothing_id');
+
+    let catalogClothes = [];
+
+    async function startBooking() {
+      const status = document.getElementById('account-status');
+
+      try {
+        const response = await fetch('/api/me');
+
+        if (response.status === 401) {
+          status.textContent = 'Please log in before booking clothing.';
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Unable to check login.');
+        }
+
+        const result = await response.json();
+
+        status.textContent =
+          `Logged in as ${result.user.name} (${result.user.role}).`;
+
+        document.getElementById('booking-content').hidden = false;
+
+        await loadClothingOptions();
+      } catch (error) {
+        status.textContent =
+          'Unable to check login. Please refresh and try again.';
+      }
+    }
+
+    async function loadClothingOptions() {
+      const dropdown = document.getElementById('rental-clothing');
+      const button = document.getElementById('book-button');
+      const message = document.getElementById('booking-message');
+
+      try {
+        const response = await fetch('/api/clothing');
+
+        if (!response.ok) {
+          throw new Error('Unable to load clothing.');
+        }
+
+        catalogClothes = await response.json();
+
+        dropdown.replaceChildren(new Option('Choose clothing', ''));
+
+        for (const clothing of catalogClothes) {
+          const label =
+            `${clothing.clothing_name} — ${clothing.size} —  `+
+            `${Number(clothing.daily_rate).toFixed(2)} THB/day`;
+
+          dropdown.add(new Option(label, clothing.clothing_id));
+        }
+
+        const selected = catalogClothes.find(
+          item => String(item.clothing_id) === selectedClothingId
+        );
+
+        if (selected) {
+          dropdown.value = selectedClothingId;
+        } else if (selectedClothingId) {
+          message.textContent =
+            'That garment is no longer in the catalog. Please choose another.';
+        }
+
+        dropdown.disabled = catalogClothes.length === 0;
+        button.disabled = catalogClothes.length === 0;
+
+        if (catalogClothes.length === 0) {
+          message.textContent = 'No clothing items are in the catalog.';
+        }
+
+        showSelectedClothing();
+      } catch (error) {
+        message.textContent =
+          'Unable to load clothing. Please refresh and try again.';
+      }
+    }
+
+    function showSelectedClothing() {
+      const id = document.getElementById('rental-clothing').value;
+      const clothing = catalogClothes.find(
+        item => String(item.clothing_id) === id
+      );
+
+      const section = document.getElementById('selected-clothing');
+      const photo = document.getElementById('selected-photo');
+
+      section.hidden = !clothing;
+
+      if (!clothing) {
+        return;
+      }
+
+      document.getElementById('selected-name').textContent =
+        clothing.clothing_name;
+
+      document.getElementById('selected-description').textContent =
+        `Size ${clothing.size} ·`  +
+        `${Number(clothing.daily_rate).toFixed(2)} THB per day.  `+
+        'Availability is checked for your selected dates.';
+
+      photo.replaceChildren();
+
+      if (clothing.image_path) {
+        const image = document.createElement('img');
+        image.src = clothing.image_path;
+        image.alt = clothing.clothing_name;
+        image.addEventListener('error', () => {
+          photo.textContent = 'Image unavailable';
+        });
+        photo.appendChild(image);
+      } else {
+        photo.textContent = 'No photo';
+      }
+    }
+
+    document
+      .getElementById('rental-clothing')
+      .addEventListener('change', showSelectedClothing);
+
+    document
+      .getElementById('rental-form')
+      .addEventListener('submit', async event => {
+        event.preventDefault();
+
+        const form = event.currentTarget;
+        const button = document.getElementById('book-button');
+        const message = document.getElementById('booking-message');
+
+        const booking = {
+          clothing_id: document.getElementById('rental-clothing').value,
+          start_date: document.getElementById('start-date').value,
+          due_date: document.getElementById('due-date').value
+        };
+
+        if (booking.due_date < booking.start_date) {
+          message.textContent = 'Due date cannot be before start date.';
+          return;
+        }
+
+        button.disabled = true;
+        message.textContent = 'Creating rental...';
+
+        try {
+          const response = await fetch('/api/rentals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(booking)
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || 'Unable to create rental.');
+          }
+
+          message.textContent =
+            `Rental #${result.rental_id} created successfully. `;
+
+          const historyLink = document.createElement('a');
+          historyLink.className = 'button-link';
+          historyLink.href = '/rentals.html';
+          historyLink.textContent = 'View rental history';
+          message.appendChild(historyLink);
+
+          form.reset();
+
+          if (
+            selectedClothingId &&
+            catalogClothes.some(
+              item => String(item.clothing_id) === selectedClothingId
+            )
+          ) {
+            document.getElementById('rental-clothing').value =
+              selectedClothingId;
+          }
+
+          showSelectedClothing();
+        } catch (error) {
+          message.textContent = error.message;
+        } finally {
+          button.disabled = catalogClothes.length === 0;
+        }
+      });
+
+    startBooking();
+  </script>
+</body>
+</html>

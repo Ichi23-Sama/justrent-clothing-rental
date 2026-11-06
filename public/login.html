@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUST//RENT — Account</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 450px;
+            margin: 50px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+            color: #222;
+        }
+
+        h1 {
+            color: #76442e;
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+
+        button {
+            padding: 10px 18px;
+            background: #3ca197;
+            color: white;
+            border: 0;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <h1>JUST//RENT</h1>
+    <h1 style="text-align: center;"></h1>
+
+
+    <h2>Log in</h2>
+
+<form id="login-form">
+    <p>
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email"
+               maxlength="150" autocomplete="username" required>
+    </p>
+
+    <p>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password"
+               autocomplete="current-password" required>
+    </p>
+
+    <button id="login-button" type="submit">Log In</button>
+</form>
+
+<p id="login-message" role="status"></p>
+
+<hr>
+
+    <h2>Create an account</h2>
+
+    <form id="register-form">
+        <p>
+            <label for="register-name">Name</label>
+            <input id="register-name" type="text"
+                   maxlength="100" autocomplete="name" required>
+        </p>
+
+        <p>
+            <label for="register-email">Email</label>
+            <input id="register-email" type="email"
+                   maxlength="150" autocomplete="email" required>
+        </p>
+
+        <p>
+            <label for="register-password">Password</label>
+            <input id="register-password" type="password"
+                   minlength="8" autocomplete="new-password" required>
+            <small>Use at least 8 characters.</small>
+        </p>
+
+        <button id="register-button" type="submit">
+            Create Account
+        </button>
+    </form>
+
+    <p id="register-message" role="status"></p>
+
+    <p><a href="/">Back to clothing catalog</a></p>
+
+    <script>
+        const registerForm = document.getElementById('register-form');
+
+        registerForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const button = document.getElementById('register-button');
+            const message = document.getElementById('register-message');
+
+            button.disabled = true;
+            message.textContent = 'Creating account...';
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: document.getElementById('register-name').value,
+                        email: document.getElementById('register-email').value,
+                        password:
+                            document.getElementById('register-password').value
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        result.error || 'Unable to create account.'
+                    );
+                }
+
+                message.textContent = result.message;
+                registerForm.reset();
+            } catch (error) {
+                message.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        const loginForm = document.getElementById('login-form');
+
+loginForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const button = document.getElementById('login-button');
+    const message = document.getElementById('login-message');
+
+    button.disabled = true;
+    message.textContent = 'Logging in...';
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Unable to log in.');
+        }
+
+        message.textContent =
+            `Logged in as ${result.user.name} (${result.user.role}).`;
+
+        loginForm.reset();
+    } catch (error) {
+        message.textContent = error.message;
+    } finally {
+        button.disabled = false;
+    }
+});
+    </script>
+</body>
+</html>
